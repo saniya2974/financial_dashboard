@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financial Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background-color: #121212;
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .sidebar {
+      width: 200px;
+      background-color: #1e1e1e;
+      height: 100vh;
+      position: fixed;
+      padding: 1rem;
+    }
+    .sidebar h2 {
+      color: #4caf50;
+      font-size: 1.5rem;
+    }
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin-top: 2rem;
+    }
+    .sidebar ul li {
+      padding: 10px 0;
+      color: #aaa;
+      cursor: pointer;
+    }
+    .sidebar ul li:hover {
+      color: #fff;
+    }
+    .main {
+      margin-left: 220px;
+      padding: 2rem;
+    }
+    .card {
+      background-color: #1e1e1e;
+      border: none;
+      color: #fff;
+    }
+    .card .value {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    .table {
+      color: white;
+    }
+    .status-paid {
+      color: #4caf50;
+      font-weight: bold;
+    }
+    .status-pending {
+      color: #ff9800;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>Penta</h2>
+    <ul>
+      <li>Dashboard</li>
+      <li>Transactions</li>
+      <li>Wallet</li>
+      <li>Analytics</li>
+      <li>Personal</li>
+      <li>Messages</li>
+      <li>Settings</li>
+    </ul>
+  </div>
+  <div class="main">
+    <div class="d-flex gap-3 mb-3">
+      <input type="text" id="searchInput" class="form-control w-25" placeholder="Search by name...">
+      <select id="filterCategory" class="form-select w-25">
+        <option value="">All Categories</option>
+        <option value="Income">Income</option>
+        <option value="Expense">Expense</option>
+      </select>
+      <select id="filterStatus" class="form-select w-25">
+        <option value="">All Statuses</option>
+        <option value="Paid">Paid</option>
+        <option value="Pending">Pending</option>
+      </select>
+      <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#csvExportModal">Export CSV</button>
+    </div>
+
+    <div class="row mb-4">
+      <div class="col-md-3"><div class="card p-3"><div>Balance</div><div id="balance" class="value">$0.00</div></div></div>
+      <div class="col-md-3"><div class="card p-3"><div>Revenue</div><div id="revenue" class="value">$0.00</div></div></div>
+      <div class="col-md-3"><div class="card p-3"><div>Expenses</div><div id="expenses" class="value">$0.00</div></div></div>
+      <div class="col-md-3"><div class="card p-3"><div>Savings</div><div id="savings" class="value">$0.00</div></div></div>
+    </div>
+
+    <div class="card p-3 mb-4"><canvas id="overviewChart"></canvas></div>
+
+    <div class="card p-3 mb-4">
+      <h5>Add Income / Expense</h5>
+      <form id="addTransactionForm">
+        <input type="text" class="form-control mb-2" id="name" placeholder="Name" required>
+        <input type="date" class="form-control mb-2" id="date" required>
+        <input type="number" class="form-control mb-2" id="amount" placeholder="Amount" required>
+        <select class="form-control mb-2" id="category">
+          <option value="Income">Income</option>
+          <option value="Expense">Expense</option>
+        </select>
+        <select class="form-control mb-2" id="status">
+          <option value="Paid">Paid</option>
+          <option value="Pending">Pending</option>
+        </select>
+        <button class="btn btn-success" type="submit">Add Transaction</button>
+      </form>
+    </div>
+
+    <div class="card p-3">
+      <h5>Recent Transactions</h5>
+      <table class="table table-dark table-striped">
+        <thead>
+          <tr>
+            <th onclick="sortTable('name')">Name</th>
+            <th onclick="sortTable('date')">Date</th>
+            <th onclick="sortTable('amount')">Amount</th>
+            <th onclick="sortTable('status')">Status</th>
+          </tr>
+        </thead>
+        <tbody id="transactionBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CSV Export Modal -->
+  <div class="modal fade" id="csvExportModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content bg-dark text-white">
+        <div class="modal-header">
+          <h5 class="modal-title">Export CSV</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="exportForm">
+            <label><input type="checkbox" name="columns" value="name" checked> Name</label><br>
+            <label><input type="checkbox" name="columns" value="date" checked> Date</label><br>
+            <label><input type="checkbox" name="columns" value="amount" checked> Amount</label><br>
+            <label><input type="checkbox" name="columns" value="category" checked> Category</label><br>
+            <label><input type="checkbox" name="columns" value="status" checked> Status</label><br>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-success" onclick="exportCSV()">Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const token = localStorage.getItem("token");
+    if (!token) window.location.href = "login.html";
+
+    let transactions = [], chart;
+    let currentSortKey = 'date';
+    let currentSortDir = 'desc';
+
+    fetch("http://localhost:5000/api/transactions", {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+      transactions = data.map(t => ({
+        name: t.user_id,
+        date: new Date(t.date).toISOString().split('T')[0],
+        amount: parseFloat(t.amount),
+        category: t.category || (parseFloat(t.amount) >= 0 ? 'Income' : 'Expense'),
+        status: t.status || 'Paid'
+      }));
+      updateDashboard();
+    });
+
+    function updateDashboard() {
+      const tbody = document.getElementById('transactionBody');
+      tbody.innerHTML = '';
+
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const cat = document.getElementById('filterCategory').value;
+      const stat = document.getElementById('filterStatus').value;
+
+      let filtered = transactions.filter(t =>
+        t.name.toLowerCase().includes(search) &&
+        (!cat || t.category === cat) &&
+        (!stat || t.status === stat)
+      );
+
+      filtered.sort((a, b) => {
+        if (currentSortKey === 'amount') return currentSortDir === 'asc' ? a.amount - b.amount : b.amount - a.amount;
+        return currentSortDir === 'asc'
+          ? a[currentSortKey].localeCompare(b[currentSortKey])
+          : b[currentSortKey].localeCompare(a[currentSortKey]);
+      });
+
+      let income = 0, expenses = 0;
+      let labels = [], incomeData = [], expenseData = [];
+
+      filtered.slice().reverse().forEach(t => {
+        tbody.innerHTML += `
+        <tr>
+          <td>${t.name}</td>
+          <td>${t.date}</td>
+          <td>$${t.amount.toFixed(2)}</td>
+          <td class="${t.status === 'Paid' ? 'status-paid' : 'status-pending'}">${t.status}</td>
+        </tr>`;
+
+        labels.push(t.date);
+        incomeData.push(t.category === 'Income' ? t.amount : 0);
+        expenseData.push(t.category === 'Expense' ? t.amount : 0);
+
+        if (t.category === 'Income') income += t.amount;
+        else expenses += t.amount;
+      });
+
+      document.getElementById('revenue').innerText = `$${income.toFixed(2)}`;
+      document.getElementById('expenses').innerText = `$${expenses.toFixed(2)}`;
+      document.getElementById('balance').innerText = `$${(income - expenses).toFixed(2)}`;
+      document.getElementById('savings').innerText = `$${(income * 0.25).toFixed(2)}`;
+
+      const ctx = document.getElementById('overviewChart').getContext('2d');
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Income', data: incomeData,
+              borderColor: '#4caf50', backgroundColor: 'rgba(76, 175, 80, 0.1)', fill: true
+            },
+            {
+              label: 'Expenses', data: expenseData,
+              borderColor: '#ff9800', backgroundColor: 'rgba(255, 152, 0, 0.1)', fill: true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: 'white' } } },
+          scales: { x: { ticks: { color: 'white' } }, y: { ticks: { color: 'white' } } }
+        }
+      });
+    }
+
+    document.getElementById("addTransactionForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const newTransaction = {
+        name: document.getElementById("name").value,
+        date: document.getElementById("date").value,
+        amount: parseFloat(document.getElementById("amount").value),
+        category: document.getElementById("category").value,
+        status: document.getElementById("status").value
+      };
+      transactions.push(newTransaction);
+      updateDashboard();
+      this.reset();
+    });
+
+    document.getElementById("searchInput").addEventListener("input", updateDashboard);
+    document.getElementById("filterCategory").addEventListener("change", updateDashboard);
+    document.getElementById("filterStatus").addEventListener("change", updateDashboard);
+
+    function sortTable(key) {
+      if (currentSortKey === key) currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+      else {
+        currentSortKey = key;
+        currentSortDir = 'asc';
+      }
+      updateDashboard();
+    }
+
+    function exportCSV() {
+      const checkboxes = document.querySelectorAll("#exportForm input:checked");
+      const selectedFields = Array.from(checkboxes).map(cb => cb.value);
+
+      fetch("http://localhost:5000/api/export?" + selectedFields.map(f => `fields=${f}`).join("&"), {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => res.blob())
+        .then(blob => {
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = "transactions.csv";
+          link.click();
+        });
+    }
+  </script>
+</body>
+</html>
